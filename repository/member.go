@@ -20,10 +20,11 @@ func (r MemberRepository) Save(member *model.Member) *model.Member {
 
 func (r MemberRepository) Update(member *model.Member) *model.Member {
 	if member.NickName != "" {
-		DB.Model(member).Where("open_id", member.OpenId).Update("nick_name", member.NickName)
+		DB.Model(&member).Where("open_id", member.OpenId).Update("nick_name", member.NickName)
 	}
 	if member.AvatarUrl != "" {
-		DB.Model(member).Where("open_id", member.OpenId).Update("avatar_url", member.AvatarUrl)
+		DB.Model(&member).Where("open_id", member.OpenId).Update("avatar_url", member.AvatarUrl)
 	}
+	DB.Where("open_id", member.OpenId).First(&member)
 	return member
 }

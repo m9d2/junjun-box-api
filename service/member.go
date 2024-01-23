@@ -20,6 +20,7 @@ func (s MemberService) GetMember(openId string) *model.Member {
 	return m
 }
 
-func (s MemberService) UpdateMember(m *model.Member) {
+func (s MemberService) UpdateMember(m *model.Member) *model.Member {
 	s.memberRepository.Update(m)
+	return m
 }

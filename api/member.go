@@ -28,7 +28,7 @@ func (h MemberHandler) updateMember(g *gin.Context) {
 		JSON(g, err)
 	} else {
 		h.service.UpdateMember(&m)
-		JSON(g, nil)
+		JSON(g, m)
 	}
 
 }
