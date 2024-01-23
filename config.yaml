@@ -1,0 +1,9 @@
+wx:
+  appid: ""
+  app-secret: ""
+cos:
+  raw-url: ""
+  secret-id: ""
+  secret-key: ""
+mysql:
+  dsn: ""
