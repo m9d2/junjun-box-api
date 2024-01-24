@@ -2,10 +2,14 @@ package api
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/go-resty/resty/v2"
 	"github.com/google/uuid"
 	"github.com/tencentyun/cos-go-sdk-v5"
 	"junjun-box-api/config"
+	"junjun-box-api/model"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -18,6 +22,7 @@ type ToolHandler struct {
 
 func (h ToolHandler) InitRouter(g *gin.RouterGroup) {
 	g.POST("upload", h.upload)
+	g.GET("weather", h.weather)
 }
 
 func (h ToolHandler) upload(c *gin.Context) {
@@ -57,4 +62,26 @@ func (h ToolHandler) upload(c *gin.Context) {
 	}
 
 	JSON(c, name)
+}
+
+func (h ToolHandler) weather(c *gin.Context) {
+	client := resty.New()
+	weather := model.Weather{}
+	city := c.Query("city")
+	u := fmt.Sprintf("https://restapi.amap.com/v3/weather/weatherInfo?city=%s&key=31bf2900a2b326ff8a0e3d3d24d66bbf", city)
+	resp, err := client.R().SetResult(&weather).Get(u)
+	if err != nil {
+		Fail(c, err)
+		return
+	}
+	if resp.StatusCode() != 200 {
+		Fail(c, errors.New(resp.Error().(string)))
+		return
+	}
+	if weather.Status != "1" {
+		Fail(c, errors.New(weather.Info))
+		return
+	}
+	l := weather.Lives[0]
+	JSON(c, l)
 }
