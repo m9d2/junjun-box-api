@@ -26,6 +26,10 @@ type Config struct {
 	Mysql struct {
 		Dsn string `yaml:"dsn"`
 	}
+	Openai struct {
+		Token    string `yaml:"token"`
+		ProxyUrl string `yaml:"proxy-url"`
+	}
 }
 
 func InitConfig() {

@@ -30,6 +30,9 @@ func InitRouter() *gin.Engine {
 
 		tool := api.ToolHandler{}
 		tool.InitRouter(g)
+
+		chat := api.ChatHandler{}
+		chat.InitRouter(g)
 	}
 
 	return r
