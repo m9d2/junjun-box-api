@@ -64,7 +64,11 @@ func Logger() gin.HandlerFunc {
 		url := c.Request.RequestURI
 		method := c.Request.Method
 		ip := getClientIP(c)
-		slog.Info("Request", "code", status, "times", elapsedMilliseconds, "method", method, "url", url, "ip", ip)
+		if status == 200 {
+			slog.Info("Request", "code", status, "times", elapsedMilliseconds, "method", method, "url", url, "ip", ip)
+		} else {
+			slog.Error("Request", "code", status, "times", elapsedMilliseconds, "method", method, "url", url, "ip", ip)
+		}
 	}
 }
 

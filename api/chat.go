@@ -2,26 +2,96 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gin-contrib/sse"
 	"github.com/gin-gonic/gin"
 	"github.com/sashabaranov/go-openai"
 	"io"
 	"junjun-box-api/config"
+	"junjun-box-api/model"
 	"log/slog"
 	"net/http"
 	"net/url"
+	"sync"
+	"time"
 )
+
+var clients = make(map[chan []byte]struct{})
+var mu sync.Mutex
 
 type ChatHandler struct {
 }
 
 func (h ChatHandler) InitRouter(g *gin.RouterGroup) {
-	g.GET("completion", h.completion)
+	g.GET("message", h.handleMessage)
+	g.GET("events", h.events)
 }
 
-func (h ChatHandler) completion(c *gin.Context) {
+func (h ChatHandler) events(c *gin.Context) {
+	w := c.Writer
+	r := c.Request
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming unsupported!", http.StatusInternalServerError)
+		return
+	}
+
+	messageChan := make(chan []byte)
+	clients[messageChan] = struct{}{}
+
+	defer func() {
+		delete(clients, messageChan)
+		close(messageChan)
+	}()
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	flusher.Flush()
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case msg := <-messageChan:
+			_, err := fmt.Fprintf(w, "data: %s\n\n", msg)
+			if err != nil {
+				mu.Unlock()
+				return
+			}
+			flusher.Flush()
+		}
+	}
+}
+
+func (h ChatHandler) handleMessage(c *gin.Context) {
+	q := c.Query("q")
+	h.completion(q)
+	JSON(c, nil)
+}
+
+func (h ChatHandler) broadcastMessages() {
+	for {
+		// Simulate periodic broadcasts
+		time.Sleep(time.Second * 5)
+
+		message := model.Event{
+			Event: "message",
+			Data:  "",
+		}
+		bytes, err := json.Marshal(message)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+		for client := range clients {
+			client <- bytes
+		}
+	}
+}
+
+func (h ChatHandler) completion(question string) {
 	cfg := openai.DefaultConfig(config.Conf.Openai.Token)
 
 	if config.Conf.Openai.ProxyUrl != "" {
@@ -37,11 +107,11 @@ func (h ChatHandler) completion(c *gin.Context) {
 	ctx := context.Background()
 	req := openai.ChatCompletionRequest{
 		Model:     openai.GPT3Dot5Turbo,
-		MaxTokens: 20,
+		MaxTokens: 2048,
 		Messages: []openai.ChatCompletionMessage{
 			{
 				Role:    openai.ChatMessageRoleUser,
-				Content: c.Query("q"),
+				Content: question,
 			},
 		},
 		Stream: true,
@@ -52,32 +122,35 @@ func (h ChatHandler) completion(c *gin.Context) {
 		return
 	}
 	defer stream.Close()
-
-	c.Header("Content-Type", "text/event-stream; charset=utf-8")
-	c.Header("Cache-Control", "no-cache")
-	c.Header("Connection", "keep-alive")
-	c.Header("Access-Control-Allow-Origin", "*")
+	currentTime := time.Now()
+	nanoTimestamp := currentTime.UnixNano()
+	millisecondTimestamp := nanoTimestamp / int64(time.Millisecond)
 	for {
 		response, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
-			return
-		}
-
-		if err != nil {
 			slog.Error(err.Error())
 			return
 		}
-		err = sse.Encode(c.Writer, sse.Event{
-			Event: "message",
-			Data: map[string]interface{}{
-				"content": response.Choices[0].Delta.Content,
-			},
-		})
+
 		if err != nil {
 			slog.Error(err.Error())
 			return
 		}
 		fmt.Print(response.Choices[0].Delta.Content)
-	}
+		message := model.Event{
+			Event: "message",
+			Id:    millisecondTimestamp,
+			Data:  response.Choices[0].Delta.Content,
+			Time:  time.Now(),
+		}
 
+		bytes, err := json.Marshal(message)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+		for client := range clients {
+			client <- bytes
+		}
+	}
 }
