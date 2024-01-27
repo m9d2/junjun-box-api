@@ -13,12 +13,10 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"sync"
 	"time"
 )
 
-var clients = make(map[chan []byte]struct{})
-var mu sync.Mutex
+var clients = make(map[string]chan []byte)
 
 type ChatHandler struct {
 }
@@ -31,18 +29,22 @@ func (h ChatHandler) InitRouter(g *gin.RouterGroup) {
 func (h ChatHandler) events(c *gin.Context) {
 	w := c.Writer
 	r := c.Request
+	cid := c.Query("cid")
+	if cid == "" {
+		return
+	}
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "Streaming unsupported!", http.StatusInternalServerError)
 		return
 	}
-
-	messageChan := make(chan []byte)
-	clients[messageChan] = struct{}{}
+	clients[cid] = make(chan []byte)
 
 	defer func() {
-		delete(clients, messageChan)
-		close(messageChan)
+		if ch, ok := clients[cid]; ok {
+			close(ch)
+			delete(clients, cid)
+		}
 	}()
 
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -54,10 +56,9 @@ func (h ChatHandler) events(c *gin.Context) {
 		select {
 		case <-r.Context().Done():
 			return
-		case msg := <-messageChan:
+		case msg := <-clients[cid]:
 			_, err := fmt.Fprintf(w, "data: %s\n\n", msg)
 			if err != nil {
-				mu.Unlock()
 				return
 			}
 			flusher.Flush()
@@ -67,31 +68,32 @@ func (h ChatHandler) events(c *gin.Context) {
 
 func (h ChatHandler) handleMessage(c *gin.Context) {
 	q := c.Query("q")
-	h.completion(q)
+	cid := c.Query("cid")
+	h.completion(cid, q)
 	JSON(c, nil)
 }
 
-func (h ChatHandler) broadcastMessages() {
-	for {
-		// Simulate periodic broadcasts
-		time.Sleep(time.Second * 5)
+//func (h ChatHandler) broadcastMessages() {
+//	for {
+//		// Simulate periodic broadcasts
+//		time.Sleep(time.Second * 5)
+//
+//		message := model.Event{
+//			Event: "message",
+//			Data:  "",
+//		}
+//		bytes, err := json.Marshal(message)
+//		if err != nil {
+//			fmt.Println("Error:", err)
+//			return
+//		}
+//		for client := range clients {
+//			client <- bytes
+//		}
+//	}
+//}
 
-		message := model.Event{
-			Event: "message",
-			Data:  "",
-		}
-		bytes, err := json.Marshal(message)
-		if err != nil {
-			fmt.Println("Error:", err)
-			return
-		}
-		for client := range clients {
-			client <- bytes
-		}
-	}
-}
-
-func (h ChatHandler) completion(question string) {
+func (h ChatHandler) completion(cid string, question string) {
 	cfg := openai.DefaultConfig(config.Conf.Openai.Token)
 
 	if config.Conf.Openai.ProxyUrl != "" {
@@ -128,7 +130,7 @@ func (h ChatHandler) completion(question string) {
 	for {
 		response, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
-			slog.Error(err.Error())
+			fmt.Println()
 			return
 		}
 
@@ -149,8 +151,6 @@ func (h ChatHandler) completion(question string) {
 			fmt.Println("Error:", err)
 			return
 		}
-		for client := range clients {
-			client <- bytes
-		}
+		clients[cid] <- bytes
 	}
 }
