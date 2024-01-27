@@ -9,7 +9,10 @@ type MemberRepository struct {
 
 func (r MemberRepository) GetByOpenId(openId string) *model.Member {
 	var member model.Member
-	DB.First(&member, "open_id", openId)
+	db := DB.First(&member, "open_id", openId)
+	if db.RowsAffected == 0 {
+		return nil
+	}
 	return &member
 }
 
@@ -19,12 +22,25 @@ func (r MemberRepository) Save(member *model.Member) *model.Member {
 }
 
 func (r MemberRepository) Update(member *model.Member) *model.Member {
+	updateFields := make(map[string]interface{})
+
 	if member.NickName != "" {
-		DB.Model(&member).Where("open_id", member.OpenId).Update("nick_name", member.NickName)
+		updateFields["nick_name"] = member.NickName
 	}
 	if member.AvatarUrl != "" {
-		DB.Model(&member).Where("open_id", member.OpenId).Update("avatar_url", member.AvatarUrl)
+		updateFields["avatar_url"] = member.AvatarUrl
 	}
+	if !member.LastLoginTime.IsZero() {
+		updateFields["last_login_time"] = member.LastLoginTime
+	}
+	if member.LastLoginIp != "" {
+		updateFields["last_login_ip"] = member.LastLoginIp
+	}
+
+	if len(updateFields) > 0 {
+		DB.Model(&member).Where("open_id", member.OpenId).Updates(updateFields)
+	}
+
 	DB.Where("open_id", member.OpenId).First(&member)
 	return member
 }

@@ -7,9 +7,12 @@ import (
 	mConfig "github.com/silenceper/wechat/v2/miniprogram/config"
 	"junjun-box-api/config"
 	"junjun-box-api/model"
+	"junjun-box-api/service"
+	"time"
 )
 
 type WxHandler struct {
+	memberService service.MemberService
 }
 
 func (h WxHandler) InitRouter(g *gin.RouterGroup) {
@@ -28,11 +31,23 @@ func (h WxHandler) code2session(g *gin.Context) {
 	a := mini.GetAuth()
 	jsCode := g.Query("jsCode")
 	res, err := a.Code2Session(jsCode)
+	now := time.Now()
 	member := &model.Member{
-		OpenId:    res.OpenID,
-		AvatarUrl: "",
-		NickName:  "",
+		OpenId:        res.OpenID,
+		LastLoginIp:   g.RemoteIP(),
+		LastLoginTime: now,
+		AvatarUrl:     "",
+		NickName:      "",
 	}
+	m := h.memberService.GetMember(res.OpenID)
+	if m == nil {
+		member.CreateTime = now
+		member.NickName = "微信用户"
+		member = h.memberService.Save(member)
+	} else {
+		h.memberService.UpdateMember(member)
+	}
+
 	if err != nil {
 		JSON(g, err)
 	} else {
