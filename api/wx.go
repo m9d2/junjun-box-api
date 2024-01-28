@@ -34,7 +34,7 @@ func (h WxHandler) code2session(g *gin.Context) {
 	now := time.Now()
 	member := &model.Member{
 		OpenId:        res.OpenID,
-		LastLoginIp:   g.RemoteIP(),
+		LastLoginIp:   g.ClientIP(),
 		LastLoginTime: now,
 		AvatarUrl:     "",
 		NickName:      "",

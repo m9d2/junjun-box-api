@@ -36,6 +36,9 @@ func (r MemberRepository) Update(member *model.Member) *model.Member {
 	if member.LastLoginIp != "" {
 		updateFields["last_login_ip"] = member.LastLoginIp
 	}
+	if member.LastLoginLocation != "" {
+		updateFields["last_login_location"] = member.LastLoginLocation
+	}
 
 	if len(updateFields) > 0 {
 		DB.Model(&member).Where("open_id", member.OpenId).Updates(updateFields)
