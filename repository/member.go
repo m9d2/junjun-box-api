@@ -7,9 +7,9 @@ import (
 type MemberRepository struct {
 }
 
-func (r MemberRepository) GetByOpenId(openId string) *model.Member {
+func (r MemberRepository) GetByOpenId(openid string) *model.Member {
 	var member model.Member
-	db := DB.First(&member, "open_id", openId)
+	db := DB.First(&member, "open_id", openid)
 	if db.RowsAffected == 0 {
 		return nil
 	}

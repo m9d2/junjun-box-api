@@ -9,8 +9,8 @@ type MemberService struct {
 	memberRepository repository.MemberRepository
 }
 
-func (s MemberService) GetMember(openId string) *model.Member {
-	return s.memberRepository.GetByOpenId(openId)
+func (s MemberService) GetMember(openid string) *model.Member {
+	return s.memberRepository.GetByOpenId(openid)
 }
 
 func (s MemberService) UpdateMember(m *model.Member) *model.Member {

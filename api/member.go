@@ -16,8 +16,8 @@ func (h MemberHandler) InitRouter(g *gin.RouterGroup) {
 }
 
 func (h MemberHandler) getMember(g *gin.Context) {
-	openId := g.Query("openId")
-	m := h.service.GetMember(openId)
+	openid := g.Query("openid")
+	m := h.service.GetMember(openid)
 	JSON(g, m)
 }
 
