@@ -68,7 +68,7 @@ func (h ToolHandler) weather(c *gin.Context) {
 	client := resty.New()
 	weather := model.Weather{}
 	city := c.Query("city")
-	u := fmt.Sprintf("https://restapi.amap.com/v3/weather/weatherInfo?city=%s&key=31bf2900a2b326ff8a0e3d3d24d66bbf", city)
+	u := fmt.Sprintf("https://restapi.amap.com/v3/weather/weatherInfo?city=%s&key=$key", city)
 	resp, err := client.R().SetResult(&weather).Get(u)
 	if err != nil {
 		Fail(c, err)
